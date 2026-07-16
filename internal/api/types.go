@@ -68,6 +68,19 @@ type ShareOptions struct {
 	AllowDownload *bool
 }
 
+// workspaceUpdateResponse matches the { success, workspace: {...} } shape from
+// PUT /api/workspaces/{id}.
+type workspaceUpdateResponse struct {
+	Success   bool `json:"success"`
+	Workspace struct {
+		ID       int    `json:"id"`
+		Name     string `json:"name"`
+		Slug     string `json:"slug"`
+		OwnerID  int    `json:"owner_id"`
+		UsedSpace int64 `json:"used_space"`
+	} `json:"workspace"`
+}
+
 // LoginResponse is the data payload returned by POST /api/auth/login.
 type LoginResponse struct {
 	Token     string `json:"token"`

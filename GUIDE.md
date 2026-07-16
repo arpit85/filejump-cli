@@ -257,6 +257,28 @@ filejump -w 0 ls /Personal/Docs      # 0 forces the personal space
 
 > Tip: `workspace ls` shows the ids and exact names you need for `use` and `-w`.
 
+### Rename a workspace
+
+```bash
+filejump workspace rename 5 "Marketing 2026"
+filejump workspace rename "Old Team" "New Team"   # by current name
+```
+
+Only the workspace owner (or an admin) can rename. If you rename the active
+workspace, the saved label is updated automatically.
+
+### Delete a workspace
+
+```bash
+filejump workspace delete 5            # prompts for confirmation
+filejump workspace delete 5 -y         # skip the confirmation
+filejump workspace delete "Old Team"
+```
+
+This is **permanent and irreversible**: it deletes the workspace and all of its
+files, folders, versions, members, and invitations. Only the owner can delete.
+If you delete the active workspace, the CLI falls back to your personal space.
+
 ---
 
 ## 11. Two-way sync
@@ -481,6 +503,8 @@ filejump workspace ls                    list workspaces you own or belong to
 filejump workspace use <id|name>          switch the active workspace
 filejump workspace current                show the active workspace
 filejump workspace reset                  switch back to your personal space
+filejump workspace rename <id|name> <new>  rename a workspace you own/admin
+filejump workspace delete <id|name> [-y]   permanently delete a workspace you own
 
 Global flag (any data command):
   -w, --workspace <id>                   operate in this workspace (0 = personal)

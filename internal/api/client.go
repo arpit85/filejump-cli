@@ -539,6 +539,77 @@ func (c *Client) ListWorkspaces() ([]Workspace, error) {
 	return ws, nil
 }
 
+// UpdateWorkspace renames a workspace (owner/admin only). Returns the new name.
+func (c *Client) UpdateWorkspace(id int, name string) (string, error) {
+	form := url.Values{}
+	form.Set("name", name)
+
+	req, err := http.NewRequest(http.MethodPut, c.BaseURL+"/workspaces/"+strconv.Itoa(id), strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return "", &APIError{Status: resp.StatusCode, Message: extractError(raw)}
+	}
+	var ur workspaceUpdateResponse
+	if err := json.Unmarshal(raw, &ur); err != nil {
+		return "", fmt.Errorf("workspaces update: decode: %w", err)
+	}
+	return ur.Workspace.Name, nil
+}
+
+// DeleteWorkspace permanently deletes a workspace and all of its files, folders,
+// versions, members, and invitations (owner only).
+func (c *Client) DeleteWorkspace(id int) error {
+	req, err := http.NewRequest(http.MethodDelete, c.BaseURL+"/workspaces/"+strconv.Itoa(id), nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return &APIError{Status: resp.StatusCode, Message: extractError(raw)}
+	}
+	return nil
+}
+
+// extractError pulls a human-readable message out of an error response body.
+// The workspace endpoints use {"error": "..."} rather than the standard
+// envelope's "message" field; "error" may also be a validation object.
+func extractError(raw []byte) string {
+	var er struct {
+		Error json.RawMessage `json:"error"`
+	}
+	if err := json.Unmarshal(raw, &er); err == nil && len(er.Error) > 0 {
+		s := strings.Trim(string(er.Error), `"`)
+		if s != "null" && s != "" {
+			return s
+		}
+	}
+	var env Envelope
+	if err := json.Unmarshal(raw, &env); err == nil && env.Message != "" {
+		return env.Message
+	}
+	return strings.TrimSpace(string(raw))
+}
+
 // CreateShare creates or updates a share link for a file and returns it.
 func (c *Client) CreateShare(fileID int, opts ShareOptions) (*Share, error) {
 	form := url.Values{}
