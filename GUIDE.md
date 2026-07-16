@@ -328,7 +328,94 @@ first so nothing gets deleted remotely.
 
 ---
 
-## 12. Troubleshooting
+## 12. Public share links (and hotlinking)
+
+`filejump share <path>` creates a public link for a file so other people (or
+your website) can reach it without logging in. It prints three URLs:
+
+- **page** — the share landing page (`https://your-site/s/<token>`).
+- **content** — an inline stream URL. This is the one to **hotlink**: put it in
+  `<img src="...">`, `<video src="...">`, or as a dataset link. It serves the
+  file with the right content type and no Referer protection.
+- **download** — a download URL that forces "Save as" and counts against
+  `--max-downloads`.
+
+### Make a basic public link
+
+```bash
+filejump share /Photos/cat.jpg
+```
+
+Output looks like:
+
+```text
+Share link created:
+  page:     https://filejump.com/s/abc123...?access=download
+  content:   https://filejump.com/s/abc123.../content   (hotlink: <img src>, <video src>, datasets)
+  download:  https://filejump.com/s/abc123.../download
+Settings:
+  active:            true
+  allow_download:    true
+  requires_password: false
+  expires_at:        (never)
+  max_downloads:     (unlimited)
+```
+
+### Use the content URL on your website
+
+For images:
+
+```html
+<img src="https://filejump.com/s/<token>/content" alt="cat">
+```
+
+For a dataset file you want people to fetch directly:
+
+```html
+<a href="https://filejump.com/s/<token>/content">Download dataset</a>
+```
+
+### Limit the link
+
+```bash
+# Expires in 7 days
+filejump share /datasets/data.csv --expires 7d
+
+# Max 1000 downloads
+filejump share /datasets/data.csv --max-downloads 1000
+
+# View-only: content streams, but the download button is disabled
+filejump share /report.pdf --view-only
+
+# Password-protected
+filejump share /secret.zip --password hunter2
+```
+
+`--expires` accepts a duration (`7d`, `24h`, `30m`) or an ISO datetime.
+
+### Inspect or revoke a link
+
+```bash
+filejump share show /Photos/cat.jpg     # print current link + settings
+filejump share revoke /Photos/cat.jpg   # delete the link
+```
+
+### Things to know
+
+- **Hotlinking works for plain HTML** (`<img>`, `<video>`, `<a>`). The content
+  endpoint does **not** send a CORS header, so cross-origin `fetch()` or
+  `<canvas>` pixel reads won't work — only direct embedding.
+- **Password-protected links can't be hotlinked raw**: the content endpoint
+  needs a session cookie to unlock, which a bare `<img src>` can't provide.
+- **Encrypted files can't be shared.**
+- The share API manages **personal-space** files only. If a workspace is
+  active, switch to personal first: `filejump -w 0 share /path` or
+  `filejump workspace reset`.
+- Revoking or expiring a link immediately breaks every hotlink that uses it.
+
+---
+
+## 13. Troubleshooting
 
 ### "Not logged in. Run `filejump login` first."
 
@@ -371,7 +458,7 @@ filejump login --server https://filejump.com
 
 ---
 
-## 13. Command reference
+## 14. Command reference
 
 ```text
 filejump login [--server URL]            log in (stores a token)
@@ -385,6 +472,10 @@ filejump download <remote> [local]        download a file
 filejump mv <src> <dest>                  move or rename a file
 filejump rm <path> [-f]                   delete a file (confirms unless -f)
 filejump sync <local-dir> [remote]        two-way sync a folder with FileJump
+
+filejump share <path> [flags]             create a public share link + hotlink URLs
+filejump share show <path>                show a file's existing share link
+filejump share revoke <path>              delete a file's share link
 
 filejump workspace ls                    list workspaces you own or belong to
 filejump workspace use <id|name>          switch the active workspace

@@ -538,3 +538,56 @@ func (c *Client) ListWorkspaces() ([]Workspace, error) {
 	}
 	return ws, nil
 }
+
+// CreateShare creates or updates a share link for a file and returns it.
+func (c *Client) CreateShare(fileID int, opts ShareOptions) (*Share, error) {
+	form := url.Values{}
+	if opts.Password != "" {
+		form.Set("password", opts.Password)
+	}
+	if opts.ExpiresAt != "" {
+		form.Set("expires_at", opts.ExpiresAt)
+	}
+	if opts.MaxDownloads > 0 {
+		form.Set("max_downloads", strconv.Itoa(opts.MaxDownloads))
+	}
+	if opts.Active != nil {
+		form.Set("active", strconv.FormatBool(*opts.Active))
+	}
+	if opts.AllowDownload != nil {
+		form.Set("allow_download", strconv.FormatBool(*opts.AllowDownload))
+	}
+	env, _, err := c.do(http.MethodPost, "/files/"+strconv.Itoa(fileID)+"/share", strings.NewReader(form.Encode()), map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	})
+	if err != nil {
+		return nil, err
+	}
+	var s Share
+	if err := json.Unmarshal(env.Data, &s); err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
+// GetShare returns the existing share for a file, or nil if none exists.
+func (c *Client) GetShare(fileID int) (*Share, error) {
+	env, _, err := c.do(http.MethodGet, "/files/"+strconv.Itoa(fileID)+"/share", nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if len(env.Data) == 0 || string(env.Data) == "null" {
+		return nil, nil
+	}
+	var s Share
+	if err := json.Unmarshal(env.Data, &s); err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
+// DeleteShare revokes a file's share link.
+func (c *Client) DeleteShare(fileID int) error {
+	_, _, err := c.do(http.MethodDelete, "/files/"+strconv.Itoa(fileID)+"/share", nil, nil)
+	return err
+}

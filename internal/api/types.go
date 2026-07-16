@@ -47,6 +47,27 @@ type Workspace struct {
 	MyRole  string `json:"my_role"`
 }
 
+// Share is the data payload returned by the file share endpoints.
+type Share struct {
+	URL              string `json:"url"`
+	Token            string `json:"token"`
+	ExpiresAt        string `json:"expires_at"`
+	RequiresPassword bool   `json:"requires_password"`
+	IsActive         bool   `json:"is_active"`
+	MaxDownloads     *int   `json:"max_downloads"`
+	DownloadCount    int    `json:"download_count"`
+	AllowDownload    bool   `json:"allow_download"`
+}
+
+// ShareOptions are the optional parameters for creating/updating a share.
+type ShareOptions struct {
+	Password      string
+	ExpiresAt     string // ISO 8601 datetime, or "" for no expiry
+	MaxDownloads  int    // 0 = leave unset (no limit)
+	Active        *bool
+	AllowDownload *bool
+}
+
 // LoginResponse is the data payload returned by POST /api/auth/login.
 type LoginResponse struct {
 	Token     string `json:"token"`

@@ -57,6 +57,10 @@ filejump mv <src> <dest>                  move or rename a file
 filejump rm <path> [-f]                   delete a file (confirms unless -f)
 filejump sync <local-dir> [remote]        two-way sync a local dir with a remote folder
 
+filejump share <path> [flags]             create a public share link and print hotlink URLs
+filejump share show <path>                show a file's existing share link
+filejump share revoke <path>              delete a file's share link
+
 filejump workspace ls                    list workspaces you own or belong to
 filejump workspace use <id|name>          switch the active workspace
 filejump workspace current                show the active workspace
@@ -177,6 +181,44 @@ For a one-off command in a different workspace without switching, pass
 filejump -w 5 ls /Campaigns
 filejump -w 0 upload ./logo.png /Branding     # 0 = personal space
 ```
+
+## Public share links & hotlinking
+
+`filejump share <path>` mints (or updates) a public share link for a file and
+prints three URLs:
+
+- **page** — the share landing page (`https://…/s/<token>`)
+- **content** — an inline stream URL you can hotlink directly (`<img src>`,
+  `<video src>`, dataset links). No Referer protection; works for plain HTML
+  embedding. (No CORS header is sent, so cross-origin `fetch()`/canvas use is
+  not supported.)
+- **download** — an attachment URL that counts against `--max-downloads`
+
+```bash
+# Mint a never-expiring public link
+filejump share /Photos/cat.jpg
+
+# Expire in 7 days, allow up to 1000 downloads
+filejump share /datasets/data.csv --expires 7d --max-downloads 1000
+
+# View-only (content still streamable, but downloads disabled)
+filejump share /report.pdf --view-only
+
+# Password-protected (note: password-protected links cannot be hotlinked raw,
+# since /content requires a session cookie to unlock)
+filejump share /secret.zip --password hunter2
+
+# Inspect or revoke
+filejump share show /Photos/cat.jpg
+filejump share revoke /Photos/cat.jpg
+```
+
+Flags: `--password`, `--expires` (duration like `7d`/`24h`/`30m` or ISO
+datetime), `--max-downloads`, `--view-only`, `--inactive`.
+
+> Note: the share API currently manages **personal-space** files only. If a
+> workspace is active, use `-w 0` (or `filejump workspace reset`) before
+> sharing. Encrypted files cannot be shared.
 
 ## Notes & limitations
 
