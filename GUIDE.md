@@ -355,7 +355,76 @@ first so nothing gets deleted remotely.
 
 ---
 
-## 12. Public share links (and hotlinking)
+## 12. Vaults
+
+A vault is a private, password-locked collection of your own files. The vault
+password is never stored by the CLI — supply it per command via `--password`
+(short `-p`) or an interactive prompt. Vault files are always uploaded to your
+**personal space** (never a shared workspace).
+
+### Create a vault
+
+```bash
+filejump vault create "Tax Docs"            # prompts for a password (and confirms it)
+filejump vault create "Tax Docs" --password 'Str0ng!pass' \
+    --description "Sensitive files" --icon 🔐 --lock-timeout 60
+```
+
+The server requires a password of at least 8 characters containing uppercase,
+lowercase, a digit, and a special character.
+
+### List and inspect vaults
+
+```bash
+filejump vault ls                           # table of all vaults
+filejump vault show "Tax Docs"              # details + current lock status
+```
+
+### Put files into a vault
+
+There is no "upload directly into a vault" endpoint, so `vault upload` uploads
+each file to your personal space first and then adds it to the vault:
+
+```bash
+filejump vault upload "Tax Docs" ./2025.pdf ./2026.pdf
+filejump vault upload 3 ./w2.pdf -p 'Str0ng!pass' --keep-unlocked
+```
+
+To add files you've already uploaded (by remote path):
+
+```bash
+filejump vault add "Tax Docs" /Receipts/scan.png /Receipts/scan2.png
+```
+
+`vault add` only accepts files you own.
+
+### List and remove files in a vault
+
+```bash
+filejump vault files "Tax Docs"             # unlocks, lists, then re-locks
+filejump vault files "Tax Docs" --keep-unlocked
+filejump vault remove "Tax Docs" 421 422     # remove by file id (files aren't deleted)
+```
+
+By default `upload`, `add`, `files`, and `remove` re-lock the vault when done.
+Pass `--keep-unlocked` to leave it unlocked for follow-up operations (the unlock
+token expires after the vault's `lock_timeout` minutes regardless).
+
+### Lock, rename, change password, delete
+
+```bash
+filejump vault lock "Tax Docs"
+filejump vault rename "Tax Docs" "Taxes"
+filejump vault password "Taxes"             # prompts for current + new password
+filejump vault delete "Taxes" -y             # deletes vault; files move back to storage
+```
+
+`vault delete` moves the vault's files back to regular storage — it does **not**
+delete the files themselves.
+
+---
+
+## 13. Public share links (and hotlinking)
 
 `filejump share <path>` creates a public link for a file so other people (or
 your website) can reach it without logging in. It prints three URLs:
@@ -442,7 +511,7 @@ filejump share revoke /Photos/cat.jpg   # delete the link
 
 ---
 
-## 13. Troubleshooting
+## 14. Troubleshooting
 
 ### "Not logged in. Run `filejump login` first."
 
@@ -485,7 +554,7 @@ filejump login --server https://filejump.com
 
 ---
 
-## 14. Command reference
+## 15. Command reference
 
 ```text
 filejump login [--server URL]            log in (stores a token)
@@ -503,6 +572,18 @@ filejump sync <local-dir> [remote]        two-way sync a folder with FileJump
 filejump share <path> [flags]             create a public share link + hotlink URLs
 filejump share show <path>                show a file's existing share link
 filejump share revoke <path>              delete a file's share link
+
+filejump vault ls                         list your vaults
+filejump vault create <name>              create a vault (prompts for a password)
+filejump vault upload <vault> <files...>  upload local files and add them to a vault
+filejump vault add <vault> <paths...>     add already-uploaded files to a vault
+filejump vault files <vault>              list files in a vault (unlocks it)
+filejump vault remove <vault> <ids...>    remove files from a vault
+filejump vault lock <vault>               lock a vault
+filejump vault show <vault>               show vault details and lock status
+filejump vault rename <vault> <new>        rename a vault
+filejump vault password <vault>           change a vault's password
+filejump vault delete <vault> [-y]        delete a vault (files move back to storage)
 
 filejump workspace ls                    list workspaces you own or belong to
 filejump workspace use <id|name>          switch the active workspace

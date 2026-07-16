@@ -726,3 +726,210 @@ func (c *Client) DeleteShare(fileID int) error {
 	_, _, err := c.do(http.MethodDelete, "/files/"+strconv.Itoa(fileID)+"/share", nil, nil)
 	return err
 }
+
+// ===================== Vaults =====================
+
+// ListVaults returns the user's vaults.
+func (c *Client) ListVaults() ([]Vault, error) {
+	env, _, err := c.do(http.MethodGet, "/vaults", nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	var vs []Vault
+	if err := json.Unmarshal(env.Data, &vs); err != nil {
+		return nil, err
+	}
+	return vs, nil
+}
+
+// GetVault returns details for a single vault.
+func (c *Client) GetVault(id int) (*Vault, error) {
+	env, _, err := c.do(http.MethodGet, "/vaults/"+strconv.Itoa(id), nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	var v Vault
+	if err := json.Unmarshal(env.Data, &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+// CreateVault creates a new vault. password must be >=8 chars with upper, lower,
+// digit, and special character (enforced server-side).
+func (c *Client) CreateVault(name, password string, opts VaultOptions) (*Vault, error) {
+	form := url.Values{}
+	form.Set("name", name)
+	form.Set("password", password)
+	applyVaultOpts(form, opts)
+	env, _, err := c.do(http.MethodPost, "/vaults", strings.NewReader(form.Encode()), map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	})
+	if err != nil {
+		return nil, err
+	}
+	var v Vault
+	if err := json.Unmarshal(env.Data, &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+// UpdateVault updates a vault's mutable settings (name/description/icon/
+// auto_lock/lock_timeout). Password is not changed here.
+func (c *Client) UpdateVault(id int, name string, opts VaultOptions) (*Vault, error) {
+	form := url.Values{}
+	if name != "" {
+		form.Set("name", name)
+	}
+	applyVaultOpts(form, opts)
+	env, _, err := c.do(http.MethodPut, "/vaults/"+strconv.Itoa(id), strings.NewReader(form.Encode()), map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	})
+	if err != nil {
+		return nil, err
+	}
+	var v Vault
+	if err := json.Unmarshal(env.Data, &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+// DeleteVault deletes a vault; its files are moved back to regular storage.
+func (c *Client) DeleteVault(id int) error {
+	_, _, err := c.do(http.MethodDelete, "/vaults/"+strconv.Itoa(id), nil, nil)
+	return err
+}
+
+// UnlockVault verifies the vault password and returns a short-lived vault token
+// used for subsequent vault file operations.
+func (c *Client) UnlockVault(id int, password string) (string, error) {
+	form := url.Values{}
+	form.Set("password", password)
+	env, _, err := c.do(http.MethodPost, "/vaults/"+strconv.Itoa(id)+"/unlock", strings.NewReader(form.Encode()), map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	})
+	if err != nil {
+		return "", err
+	}
+	var data struct {
+		Token     string `json:"token"`
+		ExpiresAt string `json:"expires_at"`
+		VaultID   int    `json:"vault_id"`
+	}
+	if err := json.Unmarshal(env.Data, &data); err != nil {
+		return "", err
+	}
+	return data.Token, nil
+}
+
+// LockVault clears the vault's unlock token.
+func (c *Client) LockVault(id int) error {
+	_, _, err := c.do(http.MethodPost, "/vaults/"+strconv.Itoa(id)+"/lock", nil, nil)
+	return err
+}
+
+// VaultStatus reports whether the vault is currently unlocked (server-side cache).
+func (c *Client) VaultStatus(id int) (unlocked bool, expiresAt string, err error) {
+	env, _, err := c.do(http.MethodGet, "/vaults/"+strconv.Itoa(id)+"/status", nil, nil)
+	if err != nil {
+		return false, "", err
+	}
+	var data struct {
+		IsUnlocked bool   `json:"is_unlocked"`
+		ExpiresAt  string `json:"expires_at"`
+	}
+	if err := json.Unmarshal(env.Data, &data); err != nil {
+		return false, "", err
+	}
+	return data.IsUnlocked, data.ExpiresAt, nil
+}
+
+// ListVaultFiles returns the files in a vault. Requires a vault unlock token.
+func (c *Client) ListVaultFiles(id int, token string) ([]VaultFile, error) {
+	env, _, err := c.do(http.MethodGet, "/vaults/"+strconv.Itoa(id)+"/files", nil, map[string]string{
+		"X-Vault-Token": token,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var fs []VaultFile
+	if err := json.Unmarshal(env.Data, &fs); err != nil {
+		return nil, err
+	}
+	return fs, nil
+}
+
+// AddVaultFiles adds existing files (and/or all files within folders) to a vault.
+// Requires a vault unlock token. Returns addedCount and the vault's new total.
+func (c *Client) AddVaultFiles(id int, token string, fileIDs, folderIDs []int) (int, int, error) {
+	form := url.Values{}
+	for _, fid := range fileIDs {
+		form.Add("file_ids[]", strconv.Itoa(fid))
+	}
+	for _, fid := range folderIDs {
+		form.Add("folder_ids[]", strconv.Itoa(fid))
+	}
+	env, _, err := c.do(http.MethodPost, "/vaults/"+strconv.Itoa(id)+"/files", strings.NewReader(form.Encode()), map[string]string{
+		"Content-Type":   "application/x-www-form-urlencoded",
+		"X-Vault-Token":  token,
+	})
+	if err != nil {
+		return 0, 0, err
+	}
+	var data struct {
+		AddedCount int `json:"added_count"`
+		TotalCount int `json:"total_count"`
+	}
+	_ = json.Unmarshal(env.Data, &data)
+	return data.AddedCount, data.TotalCount, nil
+}
+
+// RemoveVaultFiles removes files from a vault. Requires a vault unlock token.
+func (c *Client) RemoveVaultFiles(id int, token string, fileIDs []int) (int, int, error) {
+	form := url.Values{}
+	for _, fid := range fileIDs {
+		form.Add("file_ids[]", strconv.Itoa(fid))
+	}
+	env, _, err := c.do(http.MethodDelete, "/vaults/"+strconv.Itoa(id)+"/files", strings.NewReader(form.Encode()), map[string]string{
+		"Content-Type":  "application/x-www-form-urlencoded",
+		"X-Vault-Token": token,
+	})
+	if err != nil {
+		return 0, 0, err
+	}
+	var data struct {
+		RemovedCount int `json:"removed_count"`
+		TotalCount   int `json:"total_count"`
+	}
+	_ = json.Unmarshal(env.Data, &data)
+	return data.RemovedCount, data.TotalCount, nil
+}
+
+// ChangeVaultPassword changes a vault's password (requires the current password).
+func (c *Client) ChangeVaultPassword(id int, currentPassword, newPassword string) error {
+	form := url.Values{}
+	form.Set("current_password", currentPassword)
+	form.Set("new_password", newPassword)
+	_, _, err := c.do(http.MethodPost, "/vaults/"+strconv.Itoa(id)+"/change-password", strings.NewReader(form.Encode()), map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	})
+	return err
+}
+
+// applyVaultOpts writes the optional vault fields onto a form, omitting empties.
+func applyVaultOpts(form url.Values, opts VaultOptions) {
+	if opts.Description != "" {
+		form.Set("description", opts.Description)
+	}
+	if opts.Icon != "" {
+		form.Set("icon", opts.Icon)
+	}
+	if opts.AutoLock != nil {
+		form.Set("auto_lock", strconv.FormatBool(*opts.AutoLock))
+	}
+	if opts.LockTimeout > 0 {
+		form.Set("lock_timeout", strconv.Itoa(opts.LockTimeout))
+	}
+}

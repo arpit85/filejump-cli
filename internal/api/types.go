@@ -78,6 +78,40 @@ type WorkspaceStats struct {
 	Bytes   int64
 }
 
+// Vault is one entry from GET /api/vaults.
+type Vault struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Icon        string `json:"icon"`
+	AutoLock    bool   `json:"auto_lock"`
+	LockTimeout int    `json:"lock_timeout"`
+	FilesCount  int    `json:"files_count"`
+	TotalSize   int64  `json:"total_size"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
+}
+
+// VaultFile is one entry from GET /api/vaults/{id}/files.
+type VaultFile struct {
+	ID           int    `json:"id"`
+	Name         string `json:"name"`
+	OriginalName string `json:"original_name"`
+	MimeType     string `json:"mime_type"`
+	Size         int64  `json:"size"`
+	FolderID     *int   `json:"folder_id"`
+	FolderName   *string `json:"folder_name"`
+	AddedAt      string `json:"added_at"`
+}
+
+// VaultOptions are the optional parameters for creating/updating a vault.
+type VaultOptions struct {
+	Description string
+	Icon        string
+	AutoLock    *bool
+	LockTimeout int // 0 = leave unset (server default 30)
+}
+
 // Share is the data payload returned by the file share endpoints.
 type Share struct {
 	URL              string `json:"url"`

@@ -61,6 +61,18 @@ filejump share <path> [flags]             create a public share link and print h
 filejump share show <path>                show a file's existing share link
 filejump share revoke <path>              delete a file's share link
 
+filejump vault ls                         list your vaults
+filejump vault create <name>              create a vault (prompts for a password)
+filejump vault upload <vault> <files...>  upload local files and add them to a vault
+filejump vault add <vault> <paths...>     add already-uploaded files to a vault
+filejump vault files <vault>              list files in a vault (unlocks it)
+filejump vault remove <vault> <ids...>    remove files from a vault
+filejump vault lock <vault>               lock a vault
+filejump vault show <vault>               show vault details and lock status
+filejump vault rename <vault> <new>        rename a vault
+filejump vault password <vault>           change a vault's password
+filejump vault delete <vault> [-y]        delete a vault (files move back to storage)
+
 filejump workspace ls                    list workspaces you own or belong to
 filejump workspace use <id|name>          switch the active workspace
 filejump workspace current                show the active workspace
@@ -184,6 +196,48 @@ For a one-off command in a different workspace without switching, pass
 filejump -w 5 ls /Campaigns
 filejump -w 0 upload ./logo.png /Branding     # 0 = personal space
 ```
+
+## Vaults
+
+A vault is a private, password-locked collection of your own files. The vault
+password is never stored by the CLI — supply it per command via `--password`
+(short `-p`) or an interactive prompt. Vault files are always uploaded to your
+**personal space** (never a shared workspace).
+
+```bash
+filejump vault create "Tax Docs"            # prompts for a password
+filejump vault create "Tax Docs" --password 'Str0ng!pass' \
+    --description "Sensitive files" --icon 🔐 --lock-timeout 60
+
+filejump vault ls                           # list vaults
+filejump vault show "Tax Docs"              # details + lock status
+
+# Upload local files and add them to a vault:
+filejump vault upload "Tax Docs" ./2025.pdf ./2026.pdf
+filejump vault upload 3 ./w2.pdf -p 'Str0ng!pass' --keep-unlocked
+
+# Add files you've already uploaded (by remote path):
+filejump vault add "Tax Docs" /Receipts/scan.png
+
+filejump vault files "Tax Docs"             # list (unlocks, then re-locks)
+filejump vault files "Tax Docs" --keep-unlocked
+
+filejump vault remove "Tax Docs" 421 422     # remove by file id (files aren't deleted)
+filejump vault lock "Tax Docs"
+filejump vault rename "Tax Docs" "Taxes"
+filejump vault password "Taxes"             # change password (prompts)
+filejump vault delete "Tax Docs" -y         # delete vault; files move back to storage
+```
+
+Notes:
+- `vault upload` uploads each file to your personal space, then adds it to the
+  vault (there is no "upload directly into a vault" endpoint).
+- `vault add` only accepts files you own (already in your account).
+- By default, `upload`/`add`/`files`/`remove` re-lock the vault when done. Pass
+  `--keep-unlocked` to leave it unlocked for follow-up operations (the unlock
+  token expires after the vault's `lock_timeout` minutes regardless).
+- `vault delete` moves the vault's files back to regular storage; it does not
+  delete the files.
 
 ## Public share links & hotlinking
 
