@@ -205,7 +205,61 @@ restore them from there if needed.
 
 ---
 
-## 10. Two-way sync
+## 10. Workspaces
+
+FileJump lets you keep some files in your **personal space** and others in a
+**workspace** (a shared space you own or belong to, e.g. a team). The CLI
+remembers which space is active and applies it to every data command — `ls`,
+`upload`, `download`, `mkdir`, `mv`, `rm`, and `sync`.
+
+### See your workspaces
+
+```bash
+filejump workspace ls
+```
+
+The active space is marked with `*`. Your personal space always appears as the
+first row (`-` / `(personal)`).
+
+### Switch to a workspace
+
+```bash
+filejump workspace use 5                 # by numeric id
+filejump workspace use "Marketing Team"   # by name (quotes if it has spaces)
+```
+
+### Go back to your personal space
+
+```bash
+filejump workspace reset
+# or equivalently:
+filejump workspace use personal
+filejump workspace use 0
+```
+
+### Check what's active
+
+```bash
+filejump workspace current
+filejump whoami          # also shows the active workspace
+```
+
+### Run one command in a different space
+
+You don't have to switch permanently. Add `--workspace <id>` (short form `-w`)
+to any data command to override the active workspace for that single command:
+
+```bash
+filejump -w 5 ls /Campaigns
+filejump -w 5 upload ./poster.pdf /Campaigns/2026
+filejump -w 0 ls /Personal/Docs      # 0 forces the personal space
+```
+
+> Tip: `workspace ls` shows the ids and exact names you need for `use` and `-w`.
+
+---
+
+## 11. Two-way sync
 
 `filejump sync` keeps a folder on your computer and a folder in your FileJump
 account mirroring each other. Run it whenever you want to reconcile changes in
@@ -274,7 +328,7 @@ first so nothing gets deleted remotely.
 
 ---
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 ### "Not logged in. Run `filejump login` first."
 
@@ -317,12 +371,12 @@ filejump login --server https://filejump.com
 
 ---
 
-## 12. Command reference
+## 13. Command reference
 
 ```text
 filejump login [--server URL]            log in (stores a token)
 filejump logout                          log out (revokes token, clears config)
-filejump whoami                          show the logged-in account
+filejump whoami                          show the logged-in account + active workspace
 
 filejump ls [path] [-l]                   list folders/files
 filejump mkdir <path> [-p]               create a folder (and parents with -p)
@@ -331,6 +385,14 @@ filejump download <remote> [local]        download a file
 filejump mv <src> <dest>                  move or rename a file
 filejump rm <path> [-f]                   delete a file (confirms unless -f)
 filejump sync <local-dir> [remote]        two-way sync a folder with FileJump
+
+filejump workspace ls                    list workspaces you own or belong to
+filejump workspace use <id|name>          switch the active workspace
+filejump workspace current                show the active workspace
+filejump workspace reset                  switch back to your personal space
+
+Global flag (any data command):
+  -w, --workspace <id>                   operate in this workspace (0 = personal)
 ```
 
 Run `filejump <command> --help` for details on any command.

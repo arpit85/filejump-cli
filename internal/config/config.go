@@ -9,9 +9,11 @@ import (
 
 // Config is the persisted CLI state stored at ~/.config/filejump/config.json.
 type Config struct {
-	Server string `json:"server"` // e.g. https://filejump.com
-	Token  string `json:"token"`  // Sanctum bearer token
-	Email  string `json:"email"`  // for display
+	Server        string `json:"server"`         // e.g. https://filejump.com
+	Token         string `json:"token"`          // Sanctum bearer token
+	Email         string `json:"email"`          // for display
+	WorkspaceID   int    `json:"workspace_id"`   // 0 = personal space
+	WorkspaceName string `json:"workspace_name"` // display name of the active workspace
 }
 
 func configPath() (string, error) {

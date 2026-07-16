@@ -17,10 +17,11 @@ import (
 
 // Client is an authenticated FileJump API client.
 type Client struct {
-	ServerRoot string // e.g. https://filejump.com
-	BaseURL    string // e.g. https://filejump.com/api
-	Token      string // Sanctum bearer token
-	HTTP       *http.Client
+	ServerRoot  string // e.g. https://filejump.com
+	BaseURL     string // e.g. https://filejump.com/api
+	Token       string // Sanctum bearer token
+	WorkspaceID *int   // active workspace (nil = personal space)
+	HTTP        *http.Client
 }
 
 // New constructs a client from a server root (e.g. https://filejump.com).
@@ -31,6 +32,20 @@ func New(server, token string) *Client {
 		BaseURL:    server + "/api",
 		Token:      token,
 		HTTP:       &http.Client{Timeout: 30 * time.Minute},
+	}
+}
+
+// wsForm adds the active workspace_id to a form, when one is selected.
+func (c *Client) wsForm(form url.Values) {
+	if c.WorkspaceID != nil {
+		form.Set("workspace_id", strconv.Itoa(*c.WorkspaceID))
+	}
+}
+
+// wsQuery appends the active workspace_id to a url.Values query, when set.
+func (c *Client) wsQuery(q url.Values) {
+	if c.WorkspaceID != nil {
+		q.Set("workspace_id", strconv.Itoa(*c.WorkspaceID))
 	}
 }
 
@@ -152,6 +167,7 @@ func (c *Client) ListFolders(parentID *int) ([]Folder, error) {
 	if parentID != nil {
 		q.Set("parent_id", strconv.Itoa(*parentID))
 	}
+	c.wsQuery(q)
 	q.Set("per_page", "100")
 	var all []Folder
 	page := 1
@@ -180,6 +196,7 @@ func (c *Client) ListFiles(folderID *int) ([]File, error) {
 	if folderID != nil {
 		q.Set("folder_id", strconv.Itoa(*folderID))
 	}
+	c.wsQuery(q)
 	q.Set("per_page", "100")
 	var all []File
 	page := 1
@@ -209,6 +226,7 @@ func (c *Client) CreateFolder(name string, parentID *int) (*Folder, error) {
 	if parentID != nil {
 		form.Set("parent_id", strconv.Itoa(*parentID))
 	}
+	c.wsForm(form)
 	env, _, err := c.do(http.MethodPost, "/folders", strings.NewReader(form.Encode()), map[string]string{
 		"Content-Type": "application/x-www-form-urlencoded",
 	})
@@ -225,7 +243,13 @@ func (c *Client) CreateFolder(name string, parentID *int) (*Folder, error) {
 
 // DeleteFile removes a file by ID.
 func (c *Client) DeleteFile(id int) error {
-	_, _, err := c.do(http.MethodDelete, "/files/"+strconv.Itoa(id), nil, nil)
+	q := url.Values{}
+	c.wsQuery(q)
+	suffix := ""
+	if encoded := q.Encode(); encoded != "" {
+		suffix = "?" + encoded
+	}
+	_, _, err := c.do(http.MethodDelete, "/files/"+strconv.Itoa(id)+suffix, nil, nil)
 	return err
 }
 
@@ -235,6 +259,7 @@ func (c *Client) MoveFile(id int, destFolderID *int) error {
 	if destFolderID != nil {
 		form.Set("folder_id", strconv.Itoa(*destFolderID))
 	}
+	c.wsForm(form)
 	_, _, err := c.do(http.MethodPut, "/files/"+strconv.Itoa(id)+"/move", strings.NewReader(form.Encode()), map[string]string{
 		"Content-Type": "application/x-www-form-urlencoded",
 	})
@@ -245,6 +270,7 @@ func (c *Client) MoveFile(id int, destFolderID *int) error {
 func (c *Client) RenameFile(id int, newName string) error {
 	form := url.Values{}
 	form.Set("name", newName)
+	c.wsForm(form)
 	_, _, err := c.do(http.MethodPut, "/files/"+strconv.Itoa(id), strings.NewReader(form.Encode()), map[string]string{
 		"Content-Type": "application/x-www-form-urlencoded",
 	})
@@ -263,6 +289,9 @@ func (c *Client) Upload(localPath string, folderID *int) (*File, error) {
 	w := multipart.NewWriter(&buf)
 	if folderID != nil {
 		_ = w.WriteField("folder_id", strconv.Itoa(*folderID))
+	}
+	if c.WorkspaceID != nil {
+		_ = w.WriteField("workspace_id", strconv.Itoa(*c.WorkspaceID))
 	}
 	part, err := w.CreateFormFile("file", filepath.Base(localPath))
 	if err != nil {
@@ -303,6 +332,16 @@ func (c *Client) DownloadURL(rawURL, destPath string) error {
 			u = c.ServerRoot + "/" + u
 		}
 	}
+	// The download endpoint authorizes via a workspace_id query param when the
+	// active context is a workspace. Only append it for the FileJump API host so
+	// we never mutate external (S3 presigned) URLs.
+	if c.WorkspaceID != nil && strings.HasPrefix(u, c.ServerRoot) {
+		if i := strings.IndexByte(u, '?'); i >= 0 {
+			u += "&workspace_id=" + strconv.Itoa(*c.WorkspaceID)
+		} else {
+			u += "?workspace_id=" + strconv.Itoa(*c.WorkspaceID)
+		}
+	}
 	req, err := http.NewRequest(http.MethodGet, u, nil)
 	if err != nil {
 		return err
@@ -340,6 +379,7 @@ func (c *Client) GetUploadURL(name string, size int64, folderID *int) (*UploadUR
 	if folderID != nil {
 		form.Set("folder_id", strconv.Itoa(*folderID))
 	}
+	c.wsForm(form)
 
 	req, err := http.NewRequest(http.MethodPost, c.BaseURL+"/files/upload-url", strings.NewReader(form.Encode()))
 	if err != nil {
@@ -417,6 +457,7 @@ func (c *Client) CompleteUpload(r CompleteUploadRequest) (*File, error) {
 	if r.FolderID != nil {
 		form.Set("folder_id", strconv.Itoa(*r.FolderID))
 	}
+	c.wsForm(form)
 
 	req, err := http.NewRequest(http.MethodPost, c.BaseURL+"/files/upload-complete", strings.NewReader(form.Encode()))
 	if err != nil {
@@ -456,6 +497,7 @@ func (c *Client) SyncDelta(cursor string, limit int) (*SyncDeltaResponse, error)
 	if limit > 0 {
 		form.Set("limit", strconv.Itoa(limit))
 	}
+	c.wsForm(form)
 
 	req, err := http.NewRequest(http.MethodPost, c.BaseURL+"/sync/delta", strings.NewReader(form.Encode()))
 	if err != nil {
@@ -482,4 +524,17 @@ func (c *Client) SyncDelta(cursor string, limit int) (*SyncDeltaResponse, error)
 		return nil, fmt.Errorf("sync/delta: decode: %w", err)
 	}
 	return &s, nil
+}
+
+// ListWorkspaces returns every workspace the user owns or belongs to.
+func (c *Client) ListWorkspaces() ([]Workspace, error) {
+	env, _, err := c.do(http.MethodGet, "/workspaces", nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	var ws []Workspace
+	if err := json.Unmarshal(env.Data, &ws); err != nil {
+		return nil, err
+	}
+	return ws, nil
 }

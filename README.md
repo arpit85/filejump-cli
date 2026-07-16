@@ -56,9 +56,18 @@ filejump download <remote> [local]        download a file
 filejump mv <src> <dest>                  move or rename a file
 filejump rm <path> [-f]                   delete a file (confirms unless -f)
 filejump sync <local-dir> [remote]        two-way sync a local dir with a remote folder
+
+filejump workspace ls                    list workspaces you own or belong to
+filejump workspace use <id|name>          switch the active workspace
+filejump workspace current                show the active workspace
+filejump workspace reset                  switch back to your personal space
 ```
 
 Paths are written as `/Photos/2026/trip.jpg`. Root is `/`.
+
+Any data command also accepts `--workspace <id>` (or `-w <id>`) to operate in a
+specific workspace for that single invocation, overriding the saved active
+workspace. Use `-w 0` to force the personal space.
 
 ### Examples
 
@@ -138,9 +147,39 @@ Flags:
 > Note: two-way sync is powerful — deleting files locally and syncing will
 > delete them remotely too. Use `--no-push` to inspect remote changes safely.
 
+## Workspaces
+
+FileJump scopes every file and folder under either your **personal space** or a
+**workspace** you own or belong to. The CLI remembers which one is active and
+applies it to all data commands (`ls`, `upload`, `download`, `mkdir`, `mv`,
+`rm`, `sync`).
+
+```bash
+# List workspaces (the active one is marked with *)
+filejump workspace ls
+
+# Switch by id or by name
+filejump workspace use 5
+filejump workspace use "Marketing Team"
+
+# Go back to your personal space
+filejump workspace reset        # or: filejump workspace use personal
+
+# Show what's active
+filejump workspace current
+filejump whoami                 # also prints the active workspace
+```
+
+For a one-off command in a different workspace without switching, pass
+`--workspace <id>` (or `-w <id>`):
+
+```bash
+filejump -w 5 ls /Campaigns
+filejump -w 0 upload ./logo.png /Branding     # 0 = personal space
+```
+
 ## Notes & limitations
 
-- Operations are scoped to your personal storage (no workspace support yet).
 - Share-link management and token management are planned for a later release.
 - On `401 Unauthorized`, re-run `filejump login`.
 

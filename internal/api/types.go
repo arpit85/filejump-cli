@@ -39,6 +39,14 @@ type Folder struct {
 	ParentID *int   `json:"parent_id"`
 }
 
+// Workspace is one entry from GET /api/workspaces.
+type Workspace struct {
+	ID      int    `json:"id"`
+	Name    string `json:"name"`
+	OwnerID int    `json:"owner_id"`
+	MyRole  string `json:"my_role"`
+}
+
 // LoginResponse is the data payload returned by POST /api/auth/login.
 type LoginResponse struct {
 	Token     string `json:"token"`

@@ -94,6 +94,13 @@ var whoamiCmd = &cobra.Command{
 		if cfg.Email != "" {
 			fmt.Printf("Email:  %s\n", cfg.Email)
 		}
+		if cfg.WorkspaceID == 0 {
+			fmt.Println("Workspace: personal space")
+		} else if cfg.WorkspaceName != "" {
+			fmt.Printf("Workspace: %s (id %d)\n", cfg.WorkspaceName, cfg.WorkspaceID)
+		} else {
+			fmt.Printf("Workspace: id %d\n", cfg.WorkspaceID)
+		}
 		return nil
 	},
 }
