@@ -177,6 +177,7 @@ var workspaceResetCmd = &cobra.Command{
 }
 
 var workspaceDeleteYes bool
+var workspaceDeleteDryRun bool
 
 var workspaceRenameCmd = &cobra.Command{
 	Use:   "rename <id|name> <new-name>",
@@ -218,6 +219,11 @@ var workspaceDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		if workspaceDeleteDryRun {
+			return runWorkspaceDeleteDryRun(client, wk)
+		}
+
 		if !workspaceDeleteYes {
 			fmt.Printf("Permanently delete workspace %q (id %d)? This deletes ALL its files, folders, members, and invitations. [y/N] ", wk.Name, wk.ID)
 			var resp string
@@ -285,8 +291,46 @@ type apiClientLike interface {
 	ListWorkspaces() ([]api.Workspace, error)
 }
 
+// runWorkspaceDeleteDryRun prints what would be deleted without deleting.
+func runWorkspaceDeleteDryRun(client *api.Client, wk api.Workspace) error {
+	detail, err := client.GetWorkspace(wk.ID)
+	if err != nil {
+		return err
+	}
+	stats, err := client.CountWorkspace(wk.ID)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Dry run — nothing will be deleted.")
+	fmt.Println()
+	fmt.Printf("Workspace:  %q (id %d)\n", wk.Name, wk.ID)
+	role := detail.MyRole
+	if role == "" {
+		role = wk.MyRole
+	}
+	fmt.Printf("Your role:  %s\n", role)
+	if detail.Workspace.CreatedAt != "" {
+		fmt.Printf("Created:    %s\n", detail.Workspace.CreatedAt)
+	}
+	fmt.Printf("Members:    %d\n", len(detail.Members))
+	fmt.Printf("Folders:    %d\n", stats.Folders)
+	fmt.Printf("Files:      %d\n", stats.Files)
+	fmt.Printf("Total size: %s", humanSize(detail.Workspace.UsedSpace))
+	if stats.Bytes > 0 && stats.Bytes != detail.Workspace.UsedSpace {
+		fmt.Printf(" (walked: %s)", humanSize(stats.Bytes))
+	}
+	fmt.Println()
+	fmt.Println()
+	fmt.Println("This will PERMANENTLY delete the workspace and all of its files,")
+	fmt.Println("folders, versions, members, and invitations. Re-run without")
+	fmt.Println("--dry-run to proceed.")
+	return nil
+}
+
 func init() {
 	workspaceCmd.AddCommand(workspaceLsCmd, workspaceUseCmd, workspaceCurrentCmd, workspaceResetCmd, workspaceRenameCmd, workspaceDeleteCmd)
 	workspaceDeleteCmd.Flags().BoolVarP(&workspaceDeleteYes, "yes", "y", false, "skip the confirmation prompt")
+	workspaceDeleteCmd.Flags().BoolVarP(&workspaceDeleteDryRun, "dry-run", "n", false, "show what would be deleted (file/folder counts, size, members) without deleting")
 	rootCmd.AddCommand(workspaceCmd)
 }

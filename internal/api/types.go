@@ -41,10 +41,41 @@ type Folder struct {
 
 // Workspace is one entry from GET /api/workspaces.
 type Workspace struct {
-	ID      int    `json:"id"`
-	Name    string `json:"name"`
-	OwnerID int    `json:"owner_id"`
-	MyRole  string `json:"my_role"`
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	OwnerID  int    `json:"owner_id"`
+	MyRole   string `json:"my_role"`
+}
+
+// WorkspaceDetail is the richer payload from GET /api/workspaces/{id}.
+type WorkspaceDetail struct {
+	Workspace struct {
+		ID        int    `json:"id"`
+		Name      string `json:"name"`
+		Slug      string `json:"slug"`
+		OwnerID   int    `json:"owner_id"`
+		UsedSpace int64  `json:"used_space"`
+		CreatedAt string `json:"created_at"`
+		UpdatedAt string `json:"updated_at"`
+	} `json:"workspace"`
+	Members []struct {
+		ID     int    `json:"id"`
+		UserID int    `json:"user_id"`
+		Role   string `json:"role"`
+		User   struct {
+			ID    int    `json:"id"`
+			Name  string `json:"name"`
+			Email string `json:"email"`
+		} `json:"user"`
+	} `json:"members"`
+	MyRole string `json:"my_role"`
+}
+
+// WorkspaceStats holds aggregate counts gathered by walking a workspace tree.
+type WorkspaceStats struct {
+	Files   int
+	Folders int
+	Bytes   int64
 }
 
 // Share is the data payload returned by the file share endpoints.

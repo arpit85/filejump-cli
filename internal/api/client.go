@@ -590,6 +590,70 @@ func (c *Client) DeleteWorkspace(id int) error {
 	return nil
 }
 
+// GetWorkspace returns the detailed payload for a single workspace, including
+// used_space and members.
+func (c *Client) GetWorkspace(id int) (*WorkspaceDetail, error) {
+	req, err := http.NewRequest(http.MethodGet, c.BaseURL+"/workspaces/"+strconv.Itoa(id), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return nil, &APIError{Status: resp.StatusCode, Message: extractError(raw)}
+	}
+	var d WorkspaceDetail
+	if err := json.Unmarshal(raw, &d); err != nil {
+		return nil, fmt.Errorf("workspace show: decode: %w", err)
+	}
+	return &d, nil
+}
+
+// CountWorkspace walks the workspace's folder tree and totals file count,
+// folder count, and bytes. It temporarily scopes the client to the target
+// workspace for the duration of the walk.
+func (c *Client) CountWorkspace(id int) (WorkspaceStats, error) {
+	var st WorkspaceStats
+	saved := c.WorkspaceID
+	wid := id
+	c.WorkspaceID = &wid
+	defer func() { c.WorkspaceID = saved }()
+
+	// BFS over folders; a nil entry means the workspace root.
+	pending := []*int{nil}
+	for len(pending) > 0 {
+		cur := pending[0]
+		pending = pending[1:]
+
+		folders, err := c.ListFolders(cur)
+		if err != nil {
+			return st, err
+		}
+		for _, f := range folders {
+			st.Folders++
+			fid := f.ID
+			pending = append(pending, &fid)
+		}
+
+		files, err := c.ListFiles(cur)
+		if err != nil {
+			return st, err
+		}
+		for _, f := range files {
+			st.Files++
+			st.Bytes += f.Size
+		}
+	}
+	return st, nil
+}
+
 // extractError pulls a human-readable message out of an error response body.
 // The workspace endpoints use {"error": "..."} rather than the standard
 // envelope's "message" field; "error" may also be a validation object.

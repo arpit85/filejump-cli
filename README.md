@@ -67,6 +67,7 @@ filejump workspace current                show the active workspace
 filejump workspace reset                  switch back to your personal space
 filejump workspace rename <id|name> <new>  rename a workspace you own/admin
 filejump workspace delete <id|name> [-y]   permanently delete a workspace you own
+                                          (use --dry-run / -n to preview first)
 ```
 
 Paths are written as `/Photos/2026/trip.jpg`. Root is `/`.

@@ -273,11 +273,16 @@ workspace, the saved label is updated automatically.
 filejump workspace delete 5            # prompts for confirmation
 filejump workspace delete 5 -y         # skip the confirmation
 filejump workspace delete "Old Team"
+filejump workspace delete 5 --dry-run   # preview what would be deleted
 ```
 
 This is **permanent and irreversible**: it deletes the workspace and all of its
 files, folders, versions, members, and invitations. Only the owner can delete.
 If you delete the active workspace, the CLI falls back to your personal space.
+
+`--dry-run` (short `-n`) walks the workspace and prints what would be removed —
+your role, member count, folder count, file count, and total size — without
+deleting anything. Use it to sanity-check before a destructive delete.
 
 ---
 
@@ -505,6 +510,7 @@ filejump workspace current                show the active workspace
 filejump workspace reset                  switch back to your personal space
 filejump workspace rename <id|name> <new>  rename a workspace you own/admin
 filejump workspace delete <id|name> [-y]   permanently delete a workspace you own
+                                          (use --dry-run / -n to preview first)
 
 Global flag (any data command):
   -w, --workspace <id>                   operate in this workspace (0 = personal)
